@@ -4,4 +4,4 @@ logName = '../data/test/log_test.csv'
 objName = '../data/object.csv'
 outName = 'feature/obj_feature_test_3.csv'
 
-obj_transform.read(logName, objName, outName, 100000)
+obj_transform.read(logName, objName, outName, nrows=None)
