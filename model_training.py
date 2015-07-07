@@ -1,3 +1,5 @@
+import pandas as pd
+
 from sklearn.metrics import roc_auc_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.cross_validation import cross_val_score, train_test_split
@@ -6,47 +8,45 @@ import sys
 sys.path.append('/home/simengy/git/xgboost/wrapper/')
 import xgboost as xgb
 
+import datetime
 
-y_columns = [name for name in train_with_labels.columns if name.startswith('y')]
+start = datetime.datetime.now()
 
-X_numerical_base, X_numerical_meta, X_sparse_base, X_sparse_meta, y_base, y_meta = train_test_split(
-    X_numerical, 
-    X_sparse, 
-    train_with_labels[y_columns].values,
-    test_size = 0.5
+data = pd.read_csv('feature/all_total.csv', header=False)
+label = pd.read_csv('../data/train/truth_train.csv', header=False)
+
+print data.shape, label.shape
+print data.dropna().shape, label.dropna().shape, data.drop('enrollment_id', axis=1).mean()
+
+data = data.fillna(data.mean())
+
+X_train, X_test, Y_train, y_test = train_test_split(
+    data, 
+    label,
+    test_size = 0.0
 )
 
 X_meta = [] 
 X_test_meta = []
 
+
+
 print "Build meta"
 
+param = {'bst:max_depth':15, 'bst:eta':0.012, 'silent':0, 'objective':'binary:logistic' }
+param['nthread'] = 30
+plst = param.items()
+plst += [('eval_metric', 'auc')]
+num_round = 800
+        
+dX_base = xgb.DMatrix(X_train.drop('enrollment_id', axis=1).as_matrix(), label = Y_train['label'].as_matrix())
+#bst = xgb.train(plst, dX_base, num_round)
+bst = xgb.cv(param, dX_base, num_round, nfold=5, metrics = {'auc'})
+        
+#dX_test = xgb.DMatrix(X_test.drop('enrollment_id', axis=1).as_matrix())
+#predicted = bst.predict(dX_test)
 
-param = {'bst:max_depth':8, 'bst:eta':0.2, 'silent':0, 'objective':'binary:logistic' }
-        param['nthread'] = 16
-        plst = param.items()
-        #plst += [('eval_metric', 'auc')] # Multiple evals can be handled in this way
-        plst += [('eval_metric', 'logloss')]
-        num_round = 100
-        
-        dX_base = xgb.DMatrix(X_numerical_base, label = y)
-        bst = xgb.train(plst, dX_base, num_round)
-        
-        dX_num_meta = xgb.DMatrix(X_numerical_meta)
-        X_meta.append(bst.predict(dX_num_meta))
-        
-        dX_test_num = xgb.DMatrix(X_test_numerical)
-        X_test_meta.append(bst.predict(dX_test_num))
-        
-        print i, 'xgboost = ', datetime.now() - t1
-        t2 = datetime.now()
-        
-        logit = LogisticRegression(C=0.01, tol=0.000001)
-        logit.fit(X_sparse_base, y)
-        X_meta.append(logit.predict_proba(X_sparse_meta))
-        X_test_meta.append(logit.predict_proba(X_test_sparse))
-        
-        print i, 'logit = ', datetime.now() - t2
-        
-X_meta = np.column_stack(X_meta)
-X_test_meta = np.column_stack(X_test_meta)
+# Performance Matrix
+#print predicted
+
+print 'It takes time = ', datetime.datetime.now() - start

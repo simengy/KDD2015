@@ -48,8 +48,9 @@ def azureml_main_count(dataframe1 = None, dataframe2 = None):
         source_index = source_dict[dataframe1.iloc[i,4]]
         count_features[row_index,event_index+32] += 1
         count_features[row_index,source_index+39] += 1
-        # course is between 0-38
-        count_features[row_index,source_index+41] += 1
+        # course is between 0 and 38
+        course_index = course_dict[dataframe1.iloc[i,2]]
+        count_features[row_index,course_index+41] += 1
         
     dataframe1 = pd.DataFrame(count_features)
     
