@@ -1,9 +1,10 @@
 import pandas as pd
 import numpy as np
 import networkx as nx
+import datetime
+from constant import START_DATE
 
-
-def transform(dataframe=None, G=None):
+def obj_transform(dataframe=None, G=None):
 
     dataframe1 = pd.concat([dataframe['enrollment_id'], pd.get_dummies(dataframe['category'])], axis=1)
     
@@ -11,7 +12,6 @@ def transform(dataframe=None, G=None):
     G = graph(dataframe)
     
     if G:
-        
         betweenness = nx.betweenness_centrality(G)
         in_degree = nx.in_degree_centrality(G)
         out_degree = nx.out_degree_centrality(G)
@@ -26,7 +26,6 @@ def transform(dataframe=None, G=None):
             graph_features[i,1] = out_degree[dataframe['module_id'][i]] 
             graph_features[i,2] = betweenness[dataframe['module_id'][i]] 
             graph_features[i,3] = pagerank[dataframe['module_id'][i]]
-            #print 'xyxyx',i, graph_features[i,:]
 
         temp = pd.DataFrame(graph_features, index=dataframe.index)
         temp.columns = ['inDgree', 'outDegree', 'betweenness', 'pagerank'] 
@@ -52,9 +51,32 @@ def graph(dataframe=None):
             try:
                 targets = dataframe['children'][i].split()
             except:
-                raise ValueError('Data type is not correct:', i, dataframe.loc[i,], type(dataframe['children'][i]))
+                raise ValueError('Data type is not correct:', i, 
+                        dataframe.loc[i,], type(dataframe['children'][i]))
             
             for key in targets:
                 G.add_edge(source, key)
     
     return G
+
+
+def read(logName=None, objName=None, outFile=None, nrows=None):
+
+    start = datetime.datetime.now()
+
+    log_train = pd.read_csv(logName, header=False, nrows=nrows)
+    obj_train = pd.read_csv(objName, header=False, nrows=nrows)
+
+    # datetime to seconds
+    log_train['time'] = (pd.to_datetime(log_train['time']) - START_DATE) / np.timedelta64(1, 's')
+    #obj_train['start'] = (pd.to_datetime(obj_train['start']) - TIME_START) / np.timedelta64(1, 's')
+
+    merged = pd.merge(log_train, obj_train[['module_id', 'category', 'children']], 
+            left_on='object', right_on='module_id')
+
+    print merged.columns, merged.shape
+
+    obj_transform(merged).to_csv(outFile, index=True)
+
+    print 'it takes time = ', datetime.datetime.now() - start
+
