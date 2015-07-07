@@ -10,12 +10,12 @@ import xgboost as xgb
 
 import datetime
 
-EXPORT = True
+EXPORT = False
 
 
 start = datetime.datetime.now()
 
-data = pd.read_csv('feature/all_total.csv', header=False)
+data = pd.read_csv('feature/all_total_2.csv', header=False)
 label = pd.read_csv('../data/train/truth_train.csv', header=False)
 
 assert data.shape[0] == label.shape[0], 'Sizes of features (%d) and labels (%d) do not match!' % (data.shape[0], label.shape[0])
