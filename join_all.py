@@ -13,16 +13,16 @@ def join_all(enrollName, logName, objName, outFile):
 if __name__ == '__main__':
 
     # train data
-    enrollName = 'feature/enrollment_feature_3.csv'
-    logName = 'feature/log_feature_3.csv'
-    objName = 'feature/obj_feature_3.csv'
-    outFile = 'feature/all_total_3.csv'
+    enrollName = 'feature/enrollment_feature_5.csv'
+    logName = 'feature/log_feature_5.csv'
+    objName = 'feature/obj_feature_5.csv'
+    outFile = 'feature/all_total_5.csv'
     join_all(enrollName, logName, objName, outFile)
     
     # test data    
-    enrollName = 'feature/enrollment_feature_test_3.csv'
-    logName = 'feature/log_feature_test_3.csv'
-    objName = 'feature/obj_feature_test_3.csv'
-    outFile = 'feature/all_total_test_3.csv'
+    enrollName = 'feature/enrollment_feature_test_5.csv'
+    logName = 'feature/log_feature_test_5.csv'
+    objName = 'feature/obj_feature_test_5.csv'
+    outFile = 'feature/all_total_test_5.csv'
     join_all(enrollName, logName, objName, outFile)
 

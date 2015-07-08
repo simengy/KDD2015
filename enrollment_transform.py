@@ -10,6 +10,7 @@
 # function extract_enrollment_log()
 from numpy import *
 import datetime, time
+import pytz
 import pandas as pd
 from constant import START_DATE
 
@@ -129,7 +130,7 @@ def extract_enrollment_log(log):
         chunk_data[i,4] = timestamp_i
         chunk_data[i,2] = session_id_3hr
         chunk_data[i,3] = session_id_1hr
-        date_object = datetime.datetime.fromtimestamp(timestamp_i)
+        date_object = datetime.datetime.fromtimestamp(timestamp_i, tz=pytz.utc)
         
         # The year and week number of each record
         # These two variables will be used to calculate the trending of events in 
@@ -206,9 +207,9 @@ def extract_enrollment_log(log):
     
     features[7] = max(events_count)
     features[8] = min(events_count)
-    date_object = datetime.datetime.fromtimestamp(min_timestamp)
+    date_object = datetime.datetime.fromtimestamp(min_timestamp, tz=pytz.utc)
     features[9] = date_object.month
-    date_object = datetime.datetime.fromtimestamp(max_timestamp)
+    date_object = datetime.datetime.fromtimestamp(max_timestamp, tz=pytz.utc)
     features[10] = date_object.month
     features[11] = num_sessions_3hr
     features[12] = mean(session_count_3hr)

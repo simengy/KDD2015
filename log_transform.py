@@ -14,6 +14,7 @@
 # Cols 42-80: counts of course types
 from numpy import *
 from datetime import datetime
+import pytz
 import pandas as pd
 from constant import START_DATE
 
@@ -41,8 +42,8 @@ def main_count(dataframe1 = None, dataframe2 = None):
         row_index = enrollment_dict[enrollment_id]
         count_features[row_index,0] = enrollment_id
         timestamp_i = float(dataframe1.iloc[i,3])
-        dateobj = datetime.fromtimestamp(timestamp_i)
-        
+        dateobj = datetime.fromtimestamp(timestamp_i, tz=pytz.utc)
+
         weekday = dateobj.weekday()
         hour = dateobj.hour
         #weekday is between 0 and 6, where Monday is 0, and Sunday is 6
@@ -89,8 +90,9 @@ def read(enrollName=None, logName=None, outFile=None, nrows=None):
 
     enroll_train = pd.read_csv(enrollName, header=False, nrows=nrows)
     log_train = pd.read_csv(logName, header=False, nrows=nrows)
-
+    
     log_train['time'] = (pd.to_datetime(log_train['time']) - START_DATE) / timedelta64(1, 's')
+
     merged = pd.merge(enroll_train, log_train, on=['enrollment_id'])
     print merged.columns, merged.shape
 
