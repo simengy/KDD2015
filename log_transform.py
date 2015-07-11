@@ -41,8 +41,13 @@ def main_count(dataframe1 = None, dataframe2 = None):
         enrollment_id = dataframe1.iloc[i,0]
         row_index = enrollment_dict[enrollment_id]
         count_features[row_index,0] = enrollment_id
-        timestamp_i = float(dataframe1.iloc[i,3])
+        timestamp_i = float(datafraime1.iloc[i,3])
+        from_i = float(datafraime1.iloc[i,7])
+        to_i = float(datafraime1.iloc[i,8])
         dateobj = datetime.fromtimestamp(timestamp_i, tz=pytz.utc)
+        
+        # time decay: 10 days no login is dropping out
+
 
         weekday = dateobj.weekday()
         hour = dateobj.hour
@@ -87,13 +92,16 @@ def main_count(dataframe1 = None, dataframe2 = None):
 def read(enrollName=None, logName=None, outFile=None, nrows=None): 
     
     start = datetime.now()
-
+    
     enroll_train = pd.read_csv(enrollName, header=False, nrows=nrows)
     log_train = pd.read_csv(logName, header=False, nrows=nrows)
+    course_date = pd.read_csv('../data/date.csv', header=False, nrows=nrows)
     
     log_train['time'] = (pd.to_datetime(log_train['time']) - START_DATE) / timedelta64(1, 's')
-
+    course_date['from'] = (pd.to_datetime(course_date['from']) - START_DATE) / timedelta64(1, 's')
+    course_date['to'] = (pd.to_datetime(course_date['to']) - START_DATE) / timedelta64(1, 's')
     merged = pd.merge(enroll_train, log_train, on=['enrollment_id'])
+    merged = pd.merge(merged, course_date, on=['course_id'])
     print merged.columns, merged.shape
 
     main_count(merged).to_csv(outFile, index=False)

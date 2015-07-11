@@ -4,17 +4,21 @@ import networkx as nx
 import datetime
 from constant import START_DATE
 
-def depth(source, traversal, d=0):
 
+def depth(source, traversal, d=0):
+   
+    maxDepth = d
+    
     if source in traversal:
-        
-        for key in traversal[source]: 
+        for key in traversal[source]:
+            
             temp = depth(key, traversal, d+1)
             
-            if d < temp:
-                    d = temp
+            if maxDepth < temp:
+                maxDepth = temp
 
-    return d
+    return maxDepth
+
 
 def members(source, traversal, count=0):
 
@@ -26,44 +30,73 @@ def members(source, traversal, count=0):
     return count
 
 def obj_transform(dataframe=None, G=None):
-
-    dataframe1 = pd.concat([dataframe['enrollment_id'], pd.get_dummies(dataframe['category'])], axis=1)
     
+    dataframe1 = pd.concat([dataframe['enrollment_id'], pd.get_dummies(dataframe['category'])], axis=1)
+
     if G:
         betweenness = nx.betweenness_centrality(G)
         in_degree = nx.in_degree_centrality(G)
         out_degree = nx.out_degree_centrality(G)
         pagerank = nx.pagerank(G)
-        pre = nx.bfs_predecessors(G, dataframe['module_id'][0])
-        suc = nx.bfs_successors(G, dataframe['module_id'][0])
-        
+
         nrow = dataframe.shape[0]
 
-        graph_features = np.zeros((nrow, 8))
+        graph_features = np.zeros((nrow, 7))
         
         for i in xrange(nrow):
             
-            graph_features[i,0] = in_degree[dataframe['module_id'][i]]
-            graph_features[i,1] = out_degree[dataframe['module_id'][i]] 
-            graph_features[i,2] = betweenness[dataframe['module_id'][i]] 
-            graph_features[i,3] = pagerank[dataframe['module_id'][i]]
+            graph_features[i,0] = in_degree[dataframe['module_id'][i]] * 5000.0
+            graph_features[i,1] = out_degree[dataframe['module_id'][i]] * 5000.0
+            graph_features[i,2] = betweenness[dataframe['module_id'][i]] * 5000.0
+            graph_features[i,3] = pagerank[dataframe['module_id'][i]] * 5000.0
             
-            graph_features[i,4] = depth(dataframe['module_id'][i], suc)
-            graph_features[i,5] = depth(dataframe['module_id'][i], pre)
-            graph_features[i,6] = members(dataframe['module_id'][i], suc)
-            graph_features[i,7] = members(dataframe['module_id'][i], pre)
+            #pre = nx.bfs_predecessors(G, dataframe['module_id'][i])
+            suc = nx.bfs_successors(G, dataframe['module_id'][i])
+            graph_features[i,4] = depth(dataframe['module_id'][i], suc) 
+            graph_features[i,5] = len( list(nx.ancestors(G, dataframe['module_id'][i]) ))
+            graph_features[i,6] = len( list(nx.descendants(G, dataframe['module_id'][i]) ))
 
         temp = pd.DataFrame(graph_features, index=dataframe.index)
         temp.columns = ['inDgree', 'outDegree', 'betweenness', 'pagerank',
-                'depth', 'height', 'N_child', 'N_ancestor']
+                'depth', 'N_ancestor', 'N_child']
         temp['enrollment_id'] = dataframe['enrollment_id']
-        temp.to_csv('checkpoint.csv')
-        temp = temp.groupby('enrollment_id').aggregate(np.mean)
+        temp.to_csv('debugDir/checkpoint.csv')
+    
     # aggregating
     dataframe1 = dataframe1.groupby('enrollment_id').aggregate(np.sum)
-    dataframe1 = pd.concat([dataframe1, temp], axis=1)
+    
+    temp1 = temp.groupby('enrollment_id').aggregate(np.mean)
+    nameList = []
+    colName = ['inDgree', 'outDegree', 'betweenness', 'pagerank',
+                'depth', 'N_ancestor', 'N_child']
+    for name in colName:
+        nameList.append(name + '_mean')
+    temp1.columns = nameList
+    dataframe1 = pd.concat([dataframe1, temp1], axis=1)
+    
+    temp1 = temp.groupby('enrollment_id').aggregate(np.std) 
+    nameList = []
+    for name in colName:
+        nameList.append(name + '_std')
+    temp1.columns = nameList
+    dataframe1 = pd.concat([dataframe1, temp1], axis=1)
+
+    temp1 = temp.groupby('enrollment_id').aggregate(np.min)
+    nameList = []
+    for name in colName:
+        nameList.append(name + '_min')
+    temp1.columns = nameList
+    dataframe1 = pd.concat([dataframe1, temp1], axis=1)
+    
+    temp1 = temp.groupby('enrollment_id').aggregate(np.max)
+    nameList = []
+    for name in colName:
+        nameList.append(name + '_max')
+    temp1.columns = nameList
+    dataframe1 = pd.concat([dataframe1, temp1], axis=1)
     
     return dataframe1
+
 
 def graph(dataframe=None):
 
@@ -85,7 +118,12 @@ def graph(dataframe=None):
             
             for key in targets:
                 G.add_edge(source, key)
-    
+
+    # Sanity check
+    selfLoop = G.selfloop_edges()
+    assert len(selfLoop) == 0, ValueError('self loop:', selfLoop)
+    assert nx.is_directed_acyclic_graph(G), valueError('loop exists!')
+
     return G
 
 
@@ -95,11 +133,8 @@ def read(logName=None, objName=None, outFile=None, nrows=None):
 
     log_train = pd.read_csv(logName, header=False, nrows=nrows)
     obj_train = pd.read_csv(objName, header=False, nrows=nrows)
-    
+    print obj_train.shape 
     G = graph(obj_train)
-    # datetime to seconds
-    log_train['time'] = (pd.to_datetime(log_train['time']) - START_DATE) / np.timedelta64(1, 's')
-    #obj_train['start'] = (pd.to_datetime(obj_train['start']) - TIME_START) / np.timedelta64(1, 's')
 
     merged = pd.merge(log_train, obj_train[['module_id', 'category', 'children']], 
             left_on='object', right_on='module_id')
