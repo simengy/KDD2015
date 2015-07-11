@@ -92,11 +92,17 @@ def extract_session_stat(data,sessionid_index):
 def extract_enrollment_log(log):
     
     num_events = len(log)
-    chunk_data = zeros((num_events,5)) 
-    features = [0]*31
+    chunk_data = zeros((num_events,8)) 
+    features = [0]*58
     features[0] = log[0][0]
+    previous_stamp_7day = 0
+    previous_stamp_24hr = 0
+    previous_stamp_12hr = 0
     previous_stamp_3hr = 0
     previous_stamp_1hr = 0
+    session_id_7day= 0
+    session_id_24hr = 0
+    session_id_12hr = 0
     session_id_3hr = 0
     session_id_1hr = 0
     min_year = 3000
@@ -122,12 +128,24 @@ def extract_enrollment_log(log):
         if timestamp_i - previous_stamp_3hr >= 10800: 
             session_id_3hr += 1
         if timestamp_i - previous_stamp_1hr >= 3600:
-            session_id_1hr += 1
+            session_id_1hr += 1        
+        if timestamp_i - previous_stamp_1hr >= 86400:
+            session_id_24hr += 1        
+        if timestamp_i - previous_stamp_1hr >= 43200:
+            session_id_12hr += 1
+        if timestamp_i - previous_stamp_1hr >= 604800:
+            session_id_7day += 1
         
+        previous_stamp_7day = timestamp_i
+        previous_stamp_24hr = timestamp_i
+        previous_stamp_12hr = timestamp_i
         previous_stamp_3hr = timestamp_i
         previous_stamp_1hr = timestamp_i
         
         chunk_data[i,4] = timestamp_i
+        chunk_data[i,7] = session_id_7day
+        chunk_data[i,6] = session_id_24hr
+        chunk_data[i,5] = session_id_12hr
         chunk_data[i,2] = session_id_3hr
         chunk_data[i,3] = session_id_1hr
         date_object = datetime.datetime.fromtimestamp(timestamp_i, tz=pytz.utc)
@@ -170,13 +188,22 @@ def extract_enrollment_log(log):
     min_week = min(chunk_data[:,1])
     num_weeks = int(max_week - min_week)
     events_count = [0]*(num_weeks+1)
+    num_sessions_7day = max(chunk_data[:,7])
+    num_sessions_24hr = max(chunk_data[:,6])
+    num_sessions_12hr = max(chunk_data[:,5])
     num_sessions_3hr = max(chunk_data[:,2])
     num_sessions_1hr = max(chunk_data[:,3])
+    session_count_7day = [0]*num_sessions_7day
+    session_count_24hr = [0]*num_sessions_24hr
+    session_count_12hr = [0]*num_sessions_12hr
     session_count_3hr = [0]*num_sessions_3hr
     session_count_1hr = [0]*num_sessions_1hr
     
     for i in range(num_events):
         events_count[int(chunk_data[i,1]-min_week)] += 1
+        session_count_7day[int(chunk_data[i,7]-1)] += 1
+        session_count_24hr[int(chunk_data[i,6]-1)] += 1
+        session_count_12hr[int(chunk_data[i,5]-1)] += 1
         session_count_3hr[int(chunk_data[i,2]-1)] += 1
         session_count_1hr[int(chunk_data[i,3]-1)] += 1
     
@@ -211,27 +238,59 @@ def extract_enrollment_log(log):
     features[9] = date_object.month
     date_object = datetime.datetime.fromtimestamp(max_timestamp, tz=pytz.utc)
     features[10] = date_object.month
+    
+    # 3hr 
     features[11] = num_sessions_3hr
     features[12] = mean(session_count_3hr)
-    
     if num_sessions_3hr > 1:
         features[13] = std(session_count_3hr)
-    
     features[14] = max(session_count_3hr)
     features[15] = min(session_count_3hr)
+    
+    # 1hr
     features[18] = num_sessions_1hr
     features[19] = mean(session_count_1hr)
-    
     if num_sessions_1hr > 1:
         features[20] = std(session_count_1hr)
-    
     features[21] = max(session_count_1hr)
     features[22] = min(session_count_1hr)
+    
+    # 12hr
+    features[31] = num_sessions_12hr
+    features[32] = mean(session_count_12hr)
+    if num_sessions_12hr > 1:
+        features[33] = std(session_count_12hr)
+    features[34] = max(session_count_12hr)
+    features[35] = min(session_count_12hr)
+    # 24hr
+    features[36] = num_sessions_24hr
+    features[37] = mean(session_count_24hr)
+    if num_sessions_24hr > 1:
+        features[38] = std(session_count_24hr)
+    features[39] = max(session_count_24hr)
+    features[40] = min(session_count_24hr)
+
+    # 7day
+    features[41] = num_sessions_7day
+    features[42] = mean(session_count_7day)
+    if num_sessions_7day > 1:
+        features[43] = std(session_count_7day)
+    features[44] = max(session_count_7day)
+    features[45] = min(session_count_7day)
+
     session_stat_3hr = extract_session_stat(chunk_data,2)
     session_stat_1hr = extract_session_stat(chunk_data,3)
     features[23:27] = session_stat_3hr
     features[27:31] = session_stat_1hr
     
+    session_stat_12hr = extract_session_stat(chunk_data,5)
+    session_stat_24hr = extract_session_stat(chunk_data,6)
+    features[46:50] = session_stat_12hr
+    features[50:54] = session_stat_24hr
+
+    session_stat_7day = extract_session_stat(chunk_data,7)
+    features[54:58] = session_stat_7day
+
     return features
 
 # azureml_main function is the main function that is called during execution. 
@@ -243,7 +302,7 @@ def main_enrollment(dataframe1 = None, dataframe2 = None):
     # The output will be a data frame which has num_enrollment rows, and 31 columns
     # where the first column is the enrollment id,
     # and the remaining 30 columns are features
-    output_df = zeros((num_enrollment,31))
+    output_df = zeros((num_enrollment,58))
     enrollment_log = []
     previous_id = -1
     enrollment_index = 0
@@ -272,15 +331,20 @@ def main_enrollment(dataframe1 = None, dataframe2 = None):
     
     dataframe1 =  pd.DataFrame(output_df)
     dataframe1.columns = ['enrollment_id','event_trend','events_last_week',\
-                          'events_first_week','events_second_last_week',\
-                          'weekly_avg','weekly_std','max_weekly_count','min_weekly_count',\
-                          'first_event_month','last_event_month','session_count_3hr',\
-                          'session_avg_3hr','session_std_3hr','session_max_3hr','session_min_3hr',\
-                          'quadratic_b','quadratic_c','session_count_1hr',\
-                          'session_avg_1hr','sessioin_std_1hr','sessioin_max_1hr',\
-                          'session_min_1hr','session_dur_avg_3hr','session_dur_std_3hr',\
-                          'sessioin_dur_max_3hr','session_dur_min_3hr','sessioin_dur_avg_1hr',\
-                          'session_dur_std_1hr','session_dur_max_1hr','session_dur_min_1hr']
+                          'events_first_week','events_second_last_week','weekly_avg',\
+                          'weekly_std','max_weekly_count','min_weekly_count','first_event_month','last_event_month',\
+                          'session_count_3hr','session_avg_3hr','session_std_3hr','session_max_3hr','session_min_3hr',\
+                          'quadratic_b','quadratic_c',\
+                          'session_count_1hr','session_avg_1hr','sessioin_std_1hr','sessioin_max_1hr','session_min_1hr',\
+                          'session_dur_avg_3hr','session_dur_std_1hr','sessioin_dur_max_3hr','session_dur_min_3hr',\
+                          'session_dur_avg_1hr','session_dur_std_1hr','session_dur_max_1hr','session_dur_min_1hr',\
+                          'sessioin_dur_avg_12hr','session_dur_std_12hr','session_dur_max_12hr','session_dur_min_12hr',\
+                          'sessioin_dur_avg_24hr','session_dur_std_24hr','session_dur_max_24hr','session_dur_min_24hr',\
+                          'sessioin_dur_avg_7day','session_dur_std_7day','session_dur_max_7day','session_dur_min_7day',\
+                          'session_count_12hr','session_avg_12hr','session_std_12hr','session_max_12hr','session_min_12hr',\
+                          'session_count_24hr','session_avg_24hr','session_std_24hr','session_max_24hr','session_min_24hr',\
+                          'session_count_7day','session_avg_7day','session_std_7day','session_max_7day','session_min_7day']
+
     return dataframe1
 
 
