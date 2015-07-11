@@ -28,42 +28,80 @@ def main_count(dataframe1 = None, dataframe2 = None):
     num_unique_enrollment = len(unique_enrollment)
     enrollment_dict = dict(zip(unique_enrollment,range(num_unique_enrollment)))
     numrows = dataframe1.shape[0]
-    count_features = zeros((num_unique_enrollment, 80))
+    count_features = zeros((num_unique_enrollment, 84))
     
     # Define dictionaries to map source names, event types and course to indices
     source_dict = {'browser':0,'server':1}
     event_dict = dict(zip(['access','problem','page_close',\
         'nagivate','video','discussion','wiki'],range(7)))
     course_dict = dict(zip(pd.Categorical(dataframe1['course_id']).unique(),range(39)))
+    prev_timestamp = None
+    prev_id = -1
+    count = 0
     
     for i in range(numrows):
         
         enrollment_id = dataframe1.iloc[i,0]
+        
+        if prev_id != enrollment_id and count != 0:
+            count_features[row_index, 80] /= count
+            count_features[row_index, 81] /= count 
+            count_features[row_index, 82] /= count
+            count_features[row_index, 83] /= count
+        
         row_index = enrollment_dict[enrollment_id]
         count_features[row_index,0] = enrollment_id
-        timestamp_i = float(datafraime1.iloc[i,3])
-        from_i = float(datafraime1.iloc[i,7])
-        to_i = float(datafraime1.iloc[i,8])
+        timestamp_i = float(dataframe1.iloc[i,3])
+        from_i = float(dataframe1.iloc[i,7])
+        to_i = float(dataframe1.iloc[i,8] + 86400)
         dateobj = datetime.fromtimestamp(timestamp_i, tz=pytz.utc)
         
         # time decay: 10 days no login is dropping out
+        if prev_id != enrollment_id:
 
+            prev_timestamp = from_i
+            count = 0
+
+        begin_delta = (timestamp_i - from_i + 1) / 3600.0
+        end_delta = (to_i - timestamp_i) / 3600.0
+        total = (to_i - from_i) / 3600.0
+        
+        try:
+            ratio = begin_delta / total
+        except:
+            raise ZeroDivisionError('ratio Divide Zero Error', enrollment_id, dateobj, begin_delta, end_delta)
+        
+  
+        
+        diff = (timestamp_i - prev_timestamp) / 3600.0
+        try:
+            diff_r = diff / begin_delta 
+        except:
+            raise ZeroDivisionError('diff_r Divide Zero Error', enrollment_id, dateobj, begin_delta, end_delta)
+        
+        prev_id = enrollment_id
+        prev_timestamp = timestamp_i
+        count += 1
 
         weekday = dateobj.weekday()
         hour = dateobj.hour
         #weekday is between 0 and 6, where Monday is 0, and Sunday is 6
-        count_features[row_index,weekday+1] += 1  
+        count_features[row_index,weekday+1] += 1.0 / exp( end_delta / total )
         # hour is between 0 and 23
-        count_features[row_index,hour+8] += 1
+        count_features[row_index,hour+8] += 1.0 / exp( end_delta / total )
         
         event_index = event_dict[dataframe1.iloc[i,5]]
         source_index = source_dict[dataframe1.iloc[i,4]]
-        count_features[row_index,event_index+32] += 1
-        count_features[row_index,source_index+39] += 1
+        count_features[row_index,event_index+32] += 1.0 / exp( end_delta / total )
+        count_features[row_index,source_index+39] += 1.0 / exp( end_delta / total )
         
         # course is between 0 and 38
         course_index = course_dict[dataframe1.iloc[i,2]]
-        count_features[row_index,course_index+41] += 1
+        count_features[row_index,course_index+41] += 1.0 / exp( end_delta / total )
+        count_features[row_index, 80] += end_delta
+        count_features[row_index, 81] += ratio 
+        count_features[row_index, 82] += diff
+        count_features[row_index, 83] += diff_r
         
     dataframe1 = pd.DataFrame(count_features)
     
@@ -84,7 +122,8 @@ def main_count(dataframe1 = None, dataframe2 = None):
         'Course18Count', 'Course19Count', 'Course20Count', 'Course21Count', 'Course22Count', 'Course23Count', \
         'Course24Count', 'Course25Count', 'Course26Count', 'Course27Count', 'Course28Count', 'Course29Count', \
         'Course30Count', 'Course31Count', 'Course32Count', 'Course33Count', 'Course34Count', 'Course35Count', \
-        'Course36Count', 'Course37Count', 'Course38Count']    
+        'Course36Count', 'Course37Count', 'Course38Count',\
+        'end_delta', 'session_position', 'diff', 'diff_r']    
     
     return dataframe1
 
@@ -96,13 +135,13 @@ def read(enrollName=None, logName=None, outFile=None, nrows=None):
     enroll_train = pd.read_csv(enrollName, header=False, nrows=nrows)
     log_train = pd.read_csv(logName, header=False, nrows=nrows)
     course_date = pd.read_csv('../data/date.csv', header=False, nrows=nrows)
-    
+     
     log_train['time'] = (pd.to_datetime(log_train['time']) - START_DATE) / timedelta64(1, 's')
     course_date['from'] = (pd.to_datetime(course_date['from']) - START_DATE) / timedelta64(1, 's')
     course_date['to'] = (pd.to_datetime(course_date['to']) - START_DATE) / timedelta64(1, 's')
     merged = pd.merge(enroll_train, log_train, on=['enrollment_id'])
     merged = pd.merge(merged, course_date, on=['course_id'])
-    print merged.columns, merged.shape
+    #print merged.columns, merged.shape, merged.to_csv('debugDir/sortedID.csv')
 
     main_count(merged).to_csv(outFile, index=False)
 
