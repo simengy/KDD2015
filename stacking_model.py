@@ -15,7 +15,8 @@ EXPORT = False
 
 start = datetime.datetime.now()
 
-data = pd.read_csv('feature/all_total_10.csv', header=False)
+data1 = pd.read_csv('../data/ntrain.csv', header=False)
+data2 = pd.read_csv('feature/all_total_10.csv', header=False)
 label = pd.read_csv('../data/train/truth_train.csv', header=False)
 
 

@@ -5,19 +5,17 @@ from sklearn.preprocessing import normalize
 from sklearn.metrics import auc, roc_curve
 from sklearn.cross_validation import KFold, train_test_split
 
-import sys
-sys.path.append('/home/simengy/git/xgboost/wrapper/')
 import xgboost as xgb
-
 import datetime
 
 start = datetime.datetime.now()
 
-data = pd.read_csv('feature/all_total_5.csv', header=False)
+data = pd.read_csv('feature/all_total_9.csv', header=False)
+#data = pd.read_csv('../data/ntrain.csv', header=False)
 label = pd.read_csv('../data/train/truth_train.csv', header=False)
 
 # missing value
-#data = data.fillna(0)
+data = data.fillna(0)
 # sub-columns
 cols = [col for col in data.columns if 'Course' not in col]
 #data = data[cols]
@@ -35,14 +33,14 @@ stats['median'] = data.drop('enrollment_id', axis=1).median()
 stats['min'] = data.drop('enrollment_id', axis=1).min()
 stats['max'] = data.drop('enrollment_id', axis=1).max()
 stats['std'] = data.drop('enrollment_id', axis=1).std()
-stats.to_csv('mis/stats_train_5.csv')
+stats.to_csv('mis/stats_train_0711.csv')
 
 
 kf = KFold(label.shape[0], n_folds = 5, shuffle=True)
 
 
-param = {'bst:max_depth':8, 'bst:min_child_weight':1, 'bst:eta':0.008, 'silent':1, 'objective':'binary:logistic', 'subsample':0.5}
-param['nthread'] = 30
+param = {'bst:max_depth':8, 'bst:min_child_weight':1, 'bst:eta':0.010, 'silent':1, 'objective':'binary:logistic', 'subsample':0.5}
+param['nthread'] = 24
 plst = param.items()
 plst += [('eval_metric', 'auc')]
 num_round = 10
