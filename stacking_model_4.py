@@ -20,9 +20,10 @@ data2 = pd.read_csv('../data/cleaned_train.csv', header=False)
 data2 = pd.merge(data2, data1, on='enrollment_id')
 label = pd.read_csv('../data/train/truth_train.csv', header=False)
 
+data1 = pd.read_csv('feature/all_total_7.csv', header=False)
+cols = [col for col in data1.columns if 'risk' not in col]
+data1 = data1[cols]
 
-#cols = [col for col in data.columns if 'Course' not in col]
-#data = data[cols]
 # log transformation of count
 #data.iloc[:,31:115] = pd.DataFrame(np.log(data.iloc[:,31:115].as_matrix() + 1.0), columns = data.iloc[:,31:115].columns)
 #data = data.iloc[:,:-4]
@@ -45,7 +46,7 @@ X1_train, X1_test, X2_train, X2_test, Y_train, Y_test = train_test_split(
 print "Build model:"
 
 param = {'bst:max_depth':10, 'bst:min_child_weight':2, 'bst:eta':0.012, 'silent':1, 'objective':'binary:logistic', 'subsample':0.6, 'colsample_bytree':0.9, 'eval_metric': 'auc'}
-param['nthread'] = 28
+param['nthread'] = 26
 plst = param.items()
 plst += [('eval_metric', 'auc')]
 num_round = 200
@@ -53,7 +54,7 @@ num_round = 200
 dX_base = xgb.DMatrix(X1_train.drop('enrollment_id', axis=1).as_matrix(), label = Y_train['label'].as_matrix())
 
    
-if XGB_BASE:
+if XGB_BASE == True:
     bst = xgb.train(param, dX_base, num_round)
     dX_test = xgb.DMatrix(X1_test.drop('enrollment_id', axis=1).as_matrix(), label = Y_test['label'].as_matrix())
     addon = bst.predict(dX_test)
@@ -63,26 +64,27 @@ if XGB_BASE:
     X2_test['addon1'] = pd.DataFrame(list(addon), index=X2_test.index)
 
 if XGB_BASE == False:
-    clf = RandomForestClassifier(n_estimators=300, max_depth=6, n_jobs=20, verbose=True)
+    clf = RandomForestClassifier(n_estimators=400, max_depth=6, n_jobs=20, verbose=True)
     clf = clf.fit(X=X1_train.drop('enrollment_id', axis=1).as_matrix(), y=Y_train['label'].as_matrix())
     addon = clf.predict_proba(X1_test.drop('enrollment_id', axis=1).as_matrix())
 
     print 'Random Forest:', addon.shape, X2_test.shape
     print addon 
-    X2_test['addon2'] = pd.DataFrame(list(addon[:,0]), index=X2_test.index)
+    X2_test['addon2'] = pd.DataFrame(list(addon[:,1]), index=X2_test.index)
 
-    clf = LogisticRegression(C=0.1)
+    clf = LogisticRegression(C=0.01, tol=1e-7)
     clf = clf.fit(X=X1_train.drop('enrollment_id', axis=1).as_matrix(), y=Y_train['label'].as_matrix())
     addon = clf.predict_proba(X1_test.drop('enrollment_id', axis=1).as_matrix())
 
     print 'Logistic:', addon.shape, X2_test.shape
     print addon 
-    X2_test['addon3'] = pd.DataFrame(list(addon[:,0]), index=X2_test.index)
+    X2_test['addon3'] = pd.DataFrame(list(addon[:,1]), index=X2_test.index)
     
     
 # Layer 2
-param = {'bst:max_depth':6, 'bst:min_child_weight':4, 'bst:eta':0.009, 'silent':1, 'objective':'binary:logistic', 'subsample':0.5, 'colsample_bytree':0.5, 'eval_metric': 'auc'}
-num_round = 800
+param = {'bst:max_depth':7, 'bst:min_child_weight':6, 'bst:eta':0.009, 'silent':1, 'objective':'binary:logistic', 'subsample':0.5, 'colsample_bytree':0.5, 'eval_metric': 'auc'}
+param['nthread'] = 20
+num_round = 900
 
 dX_base = xgb.DMatrix(X2_test.drop('enrollment_id', axis=1).as_matrix(), label = Y_test['label'].as_matrix())
     
@@ -90,15 +92,6 @@ dX_base = xgb.DMatrix(X2_test.drop('enrollment_id', axis=1).as_matrix(), label =
 if EXPORT == False:
     bst = xgb.cv(param, dX_base, num_round, nfold=5, metrics={'auc'})
     
-    #clf = RandomForestClassifier(n_estimators=100, max_depth=7, n_jobs=5, verbose=True)
-    #clf = LogisticRegression(C=0.01, tol=1e-5)
-
-    #clf = clf.fit(X=X_test.drop('enrollment_id', axis=1).as_matrix(), y=Y_test['label'].as_matrix())
-    #addon = clf.predict_proba(X_train.drop('enrollment_id', axis=1).as_matrix())
-    
-    #score = cross_val_score(clf, X=X2_test.drop('enrollment_id', axis=1).as_matrix(), y=Y_test['label'].as_matrix(), scoring='roc_auc', cv=5, verbose=1)
-    
-    #print np.mean(score), '+-', np.std(score)
     print 'It takes time = ', datetime.datetime.now() - start
     
 else:
@@ -109,12 +102,12 @@ else:
     data2 = pd.merge(data2, data1, on='enrollment_id')
     # log transformation of count
     #data.iloc[:,31:115] = pd.DataFrame(np.log(data.iloc[:,31:115].as_matrix() + 1.0), columns = data.iloc[:,31:115].columns)
-    data = data.fillna(0)
+    data2 = data2.fillna(0)
     #data = data.iloc[:,:-4]
     
     dX_test = xgb.DMatrix(data2.drop('enrollment_id', axis=1).as_matrix())
     predicted = bst.predict(dX_test)
-    results = data[['enrollment_id']].astype(int)
+    results = data2[['enrollment_id']].astype(int)
     results['predicted'] = pd.DataFrame(predicted)
 
     print results.shape, results.columns
